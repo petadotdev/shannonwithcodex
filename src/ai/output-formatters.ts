@@ -28,6 +28,10 @@ interface ToolCall {
   input?: ToolCallInput;
 }
 
+function getRuntimeLabel(): string {
+  return process.env.SHANNON_AI_BACKEND === 'codex' ? 'Codex' : 'Claude Code';
+}
+
 /**
  * Get agent prefix for parallel execution
  */
@@ -351,7 +355,7 @@ export function formatErrorOutput(
   } else if (context.useCleanOutput) {
     lines.push(`${context.agentType} failed (${formatDuration(duration)})`);
   } else {
-    lines.push(`  Claude Code failed: ${description} (${formatDuration(duration)})`);
+    lines.push(`  ${getRuntimeLabel()} failed: ${description} (${formatDuration(duration)})`);
   }
 
   lines.push(`    Error Type: ${error.constructor.name}`);
@@ -385,7 +389,7 @@ export function formatCompletionMessage(
     return `${context.agentType.charAt(0).toUpperCase() + context.agentType.slice(1)} complete! (${turnCount} turns, ${formatDuration(duration)})`;
   }
 
-  return `  Claude Code completed: ${description} (${turnCount} turns) in ${formatDuration(duration)}`;
+  return `  ${getRuntimeLabel()} completed: ${description} (${turnCount} turns) in ${formatDuration(duration)}`;
 }
 
 export function formatToolUseOutput(

@@ -34,6 +34,28 @@ export const SaveDeliverableInputSchema = z.object({
 });
 
 export type SaveDeliverableInput = z.infer<typeof SaveDeliverableInputSchema>;
+export const SAVE_DELIVERABLE_NAME = 'save_deliverable';
+export const SAVE_DELIVERABLE_DESCRIPTION = 'Saves deliverable files with automatic validation. Queue files must have {"vulnerabilities": [...]} structure. For large reports, write the file to disk first then pass file_path instead of inline content to avoid output token limits.';
+export const SaveDeliverableJsonSchema = {
+  type: 'object',
+  properties: {
+    deliverable_type: {
+      type: 'string',
+      enum: Object.values(DeliverableType),
+      description: 'Type of deliverable to save',
+    },
+    content: {
+      type: 'string',
+      description: 'File content (markdown for analysis/evidence, JSON for queues). Optional if file_path is provided.',
+    },
+    file_path: {
+      type: 'string',
+      description: 'Path to a file whose contents should be used as the deliverable content. Relative paths are resolved against the deliverables directory.',
+    },
+  },
+  required: ['deliverable_type'],
+  additionalProperties: false,
+} as const;
 
 /**
  * Check if a path is contained within a base directory.
@@ -95,7 +117,7 @@ function resolveContent(
  * This factory pattern ensures each MCP server instance has its own targetDir,
  * preventing race conditions when multiple workflows run in parallel.
  */
-function createSaveDeliverableHandler(targetDir: string) {
+export function createSaveDeliverableHandler(targetDir: string) {
   return async function saveDeliverable(args: SaveDeliverableInput): Promise<ToolResult> {
     try {
       const { deliverable_type } = args;
@@ -147,8 +169,8 @@ function createSaveDeliverableHandler(targetDir: string) {
  */
 export function createSaveDeliverableTool(targetDir: string) {
   return tool(
-    'save_deliverable',
-    'Saves deliverable files with automatic validation. Queue files must have {"vulnerabilities": [...]} structure. For large reports, write the file to disk first then pass file_path instead of inline content to avoid output token limits.',
+    SAVE_DELIVERABLE_NAME,
+    SAVE_DELIVERABLE_DESCRIPTION,
     SaveDeliverableInputSchema.shape,
     createSaveDeliverableHandler(targetDir)
   );

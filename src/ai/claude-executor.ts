@@ -25,26 +25,15 @@ import { createProgressManager } from './progress-manager.js';
 import { createAuditLogger } from './audit-logger.js';
 import { getActualModelName } from './router-utils.js';
 import { resolveModel, type ModelTier } from './models.js';
+import { runCodexPrompt } from './codex-executor.js';
+import type { AgentPromptResult } from './prompt-result.js';
 import type { ActivityLogger } from '../types/activity-logger.js';
 
 declare global {
   var SHANNON_DISABLE_LOADER: boolean | undefined;
 }
 
-export interface ClaudePromptResult {
-  result?: string | null | undefined;
-  success: boolean;
-  duration: number;
-  turns?: number | undefined;
-  cost: number;
-  model?: string | undefined;
-  partialCost?: number | undefined;
-  apiErrorDetected?: boolean | undefined;
-  error?: string | undefined;
-  errorType?: string | undefined;
-  prompt?: string | undefined;
-  retryable?: boolean | undefined;
-}
+export type ClaudePromptResult = AgentPromptResult;
 
 interface StdioMcpServer {
   type: 'stdio';
@@ -206,6 +195,19 @@ export async function runClaudePrompt(
   logger: ActivityLogger,
   modelTier: ModelTier = 'medium'
 ): Promise<ClaudePromptResult> {
+  if (process.env.SHANNON_AI_BACKEND === 'codex') {
+    return runCodexPrompt(
+      prompt,
+      sourceDir,
+      context,
+      description,
+      agentName,
+      auditSession,
+      logger,
+      modelTier
+    );
+  }
+
   // 1. Initialize timing and prompt
   const timer = new Timer(`agent-${description.toLowerCase().replace(/\s+/g, '-')}`);
   const fullPrompt = context ? `${context}\n\n${prompt}` : prompt;

@@ -35,3 +35,19 @@ export function resolveModel(tier: ModelTier = 'medium'): string {
       return process.env.ANTHROPIC_MEDIUM_MODEL || DEFAULT_MODELS.medium;
   }
 }
+
+/** Resolve the Codex model for a tier, or return undefined to use the CLI default. */
+export function resolveCodexModel(tier: ModelTier = 'medium'): string | undefined {
+  if (process.env.CODEX_MODEL) {
+    return process.env.CODEX_MODEL;
+  }
+
+  switch (tier) {
+    case 'small':
+      return process.env.CODEX_SMALL_MODEL;
+    case 'large':
+      return process.env.CODEX_LARGE_MODEL;
+    default:
+      return process.env.CODEX_MEDIUM_MODEL;
+  }
+}

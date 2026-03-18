@@ -14,17 +14,20 @@
  * Checks run sequentially, cheapest first:
  * 1. Repository path exists and contains .git
  * 2. Config file parses and validates (if provided)
- * 3. Credentials validate via Claude Agent SDK query (API key, OAuth, Bedrock, Vertex AI, or router mode)
+ * 3. Credentials validate via Claude Agent SDK query or codex exec (API key, OAuth, Bedrock, Vertex AI, router mode, or native Codex mode)
  */
 
 import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import { spawn } from 'child_process';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKAssistantMessageError } from '@anthropic-ai/claude-agent-sdk';
 import { PentestError, isRetryableError } from './error-handling.js';
 import { ErrorCode } from '../types/errors.js';
 import { type Result, ok, err } from '../types/result.js';
 import { parseConfig } from '../config-parser.js';
-import { resolveModel } from '../ai/models.js';
+import { resolveCodexModel, resolveModel } from '../ai/models.js';
 import type { ActivityLogger } from '../types/activity-logger.js';
 
 // === Repository Validation ===
@@ -156,10 +159,90 @@ function classifySdkError(
   }
 }
 
-/** Validate credentials via a minimal Claude Agent SDK query. */
+/** Validate credentials via a minimal Claude Agent SDK query or codex exec. */
 async function validateCredentials(
   logger: ActivityLogger
 ): Promise<Result<void, PentestError>> {
+  if (process.env.SHANNON_AI_BACKEND === 'codex') {
+    const codexHome = process.env.CODEX_HOME || path.join(process.env.HOME || '/tmp', '.codex');
+    const authFile = path.join(codexHome, 'auth.json');
+
+    try {
+      await fs.access(authFile);
+    } catch {
+      return err(
+        new PentestError(
+          `Codex mode requires ${authFile}. Run 'codex login' on the host and mount that directory into the worker.`,
+          'config',
+          false,
+          { authFile },
+          ErrorCode.AUTH_FAILED
+        )
+      );
+    }
+
+    const lastMessagePath = path.join(os.tmpdir(), 'shannon-codex-preflight.txt');
+    const args = [
+      'exec',
+      '--json',
+      '--ephemeral',
+      '--sandbox',
+      'read-only',
+      '--skip-git-repo-check',
+      '--output-last-message',
+      lastMessagePath,
+    ];
+    const model = resolveCodexModel('small');
+    if (model) {
+      args.push('--model', model);
+    }
+    args.push('Reply with OK and nothing else.');
+
+    logger.info('Validating Codex session via codex exec...');
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const child = spawn('codex', args, {
+          cwd: process.cwd(),
+          env: process.env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        let stderr = '';
+
+        child.stderr.setEncoding('utf8');
+        child.stderr.on('data', (chunk: string) => {
+          stderr += chunk;
+        });
+
+        child.on('error', reject);
+        child.on('close', (code) => {
+          if (code === 0) {
+            resolve();
+            return;
+          }
+          reject(new Error(stderr.trim() || `codex exec exited with code ${code ?? 'unknown'}`));
+        });
+      });
+
+      logger.info('Codex credentials OK');
+      return ok(undefined);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return err(
+        new PentestError(
+          `Codex validation failed: ${message}`,
+          'config',
+          false,
+          { authFile },
+          ErrorCode.AUTH_FAILED
+        )
+      );
+    } finally {
+      await fs.rm(lastMessagePath, { force: true });
+    }
+  }
+
   // 1. Router mode — can't validate provider keys, just warn
   if (process.env.ANTHROPIC_BASE_URL) {
     logger.warn('Router mode detected — skipping API credential validation');

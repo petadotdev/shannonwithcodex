@@ -21,6 +21,19 @@ interface IncludeReplacement {
   content: string;
 }
 
+function isCodexBackend(): boolean {
+  return process.env.SHANNON_AI_BACKEND === 'codex';
+}
+
+function adaptPromptForCodex(prompt: string, mcpServer: string): string {
+  const codexPlaywrightPrefix = `mcp__${mcpServer}`;
+
+  return prompt
+    .replaceAll(`${mcpServer}__`, `${codexPlaywrightPrefix}__`)
+    .replace(/\bsave_deliverable\b/g, 'mcp__shannon-helper__save_deliverable')
+    .replace(/\bgenerate_totp\b/g, 'mcp__shannon-helper__generate_totp');
+}
+
 // Pure function: Build complete login instructions from config
 async function buildLoginInstructions(authentication: Authentication, logger: ActivityLogger): Promise<string> {
   try {
@@ -250,7 +263,13 @@ export async function loadPrompt(
     template = await processIncludes(template, promptsDir);
 
     // 5. Interpolate variables and return final prompt
-    return await interpolateVariables(template, enhancedVariables, config, logger);
+    const prompt = await interpolateVariables(template, enhancedVariables, config, logger);
+
+    if (isCodexBackend()) {
+      return adaptPromptForCodex(prompt, enhancedVariables.MCP_SERVER || 'playwright-agent1');
+    }
+
+    return prompt;
   } catch (error) {
     if (error instanceof PentestError) {
       throw error;

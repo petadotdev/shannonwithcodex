@@ -148,6 +148,7 @@ Shannon Pro supports a self-hosted runner model (similar to GitHub Actions self-
   - **Claude Code OAuth token**
   - **AWS Bedrock** - Route through Amazon Bedrock with AWS credentials (see [AWS Bedrock](#aws-bedrock))
   - **Google Vertex AI** - Route through Google Cloud Vertex AI (see [Google Vertex AI](#google-vertex-ai))
+  - **Codex CLI login** - Native `codex exec` execution using `~/.codex/auth.json` inside the worker container
   - **[EXPERIMENTAL - UNSUPPORTED] Alternative providers via Router Mode** - OpenAI or Google Gemini via OpenRouter (see [Router Mode](#experimental---unsupported-router-mode-alternative-providers))
 
 ### Quick Start
@@ -452,6 +453,32 @@ ANTHROPIC_LARGE_MODEL=claude-opus-4-6
 ```
 
 Set `CLOUD_ML_REGION=global` for global endpoints, or a specific region like `us-east5`. Some models may not be available on global endpoints — see the [Vertex AI Model Garden](https://console.cloud.google.com/vertex-ai/model-garden) for region availability.
+
+### Native Codex Mode
+
+Shannon can also run agents through the Codex CLI directly instead of the Anthropic SDK/router path. This is the cleanest option when you want Shannon to use your saved Codex login only.
+
+#### Quick Setup
+
+1. Sign into Codex on the host machine so `~/.codex/auth.json` exists:
+
+```bash
+codex login
+```
+
+2. Optionally pin a Codex model in `.env`:
+
+```bash
+CODEX_MODEL=gpt-5.4
+```
+
+3. Run with `CODEX=true`:
+
+```bash
+./shannon start URL=https://example.com REPO=repo-name CODEX=true
+```
+
+In this mode Shannon mounts your host `~/.codex` directory into the worker container, creates a per-run Codex config with the Shannon helper MCP tools plus the assigned Playwright MCP server, and executes agents via `codex exec`.
 
 ### [EXPERIMENTAL - UNSUPPORTED] Router Mode (Alternative Providers)
 

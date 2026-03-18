@@ -19,6 +19,7 @@ services:
     entrypoint: ["node", "dist/temporal/worker.js"]
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
+      - SHANNON_AI_BACKEND=${SHANNON_AI_BACKEND:-anthropic}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - ANTHROPIC_BASE_URL=${ANTHROPIC_BASE_URL:-}  # Optional: route through claude-code-router
       - ANTHROPIC_AUTH_TOKEN=${ANTHROPIC_AUTH_TOKEN:-}  # Auth token for router
@@ -35,6 +36,11 @@ services:
       - ANTHROPIC_MEDIUM_MODEL=${ANTHROPIC_MEDIUM_MODEL:-}
       - ANTHROPIC_LARGE_MODEL=${ANTHROPIC_LARGE_MODEL:-}
       - CLAUDE_CODE_MAX_OUTPUT_TOKENS=${CLAUDE_CODE_MAX_OUTPUT_TOKENS:-64000}
+      - CODEX_HOME=/codex-home
+      - CODEX_MODEL=${CODEX_MODEL:-}
+      - CODEX_SMALL_MODEL=${CODEX_SMALL_MODEL:-}
+      - CODEX_MEDIUM_MODEL=${CODEX_MEDIUM_MODEL:-}
+      - CODEX_LARGE_MODEL=${CODEX_LARGE_MODEL:-}
     depends_on:
       temporal:
         condition: service_healthy
@@ -46,6 +52,7 @@ services:
       - ./credentials:/app/credentials:ro
       - ./repos:/repos
       - ${BENCHMARKS_BASE:-.}:/benchmarks
+      - ${SHANNON_CODEX_HOME:-./.codex-empty}:/codex-home
     shm_size: 2gb
     ipc: host
     security_opt:

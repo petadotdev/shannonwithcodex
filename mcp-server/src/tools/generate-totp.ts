@@ -31,6 +31,20 @@ export const GenerateTotpInputSchema = z.object({
 });
 
 export type GenerateTotpInput = z.infer<typeof GenerateTotpInputSchema>;
+export const GENERATE_TOTP_NAME = 'generate_totp';
+export const GENERATE_TOTP_DESCRIPTION = 'Generates 6-digit TOTP code for authentication. Secret must be base32-encoded.';
+export const GenerateTotpJsonSchema = {
+  type: 'object',
+  properties: {
+    secret: {
+      type: 'string',
+      description: 'Base32-encoded TOTP secret',
+      pattern: '^[A-Z2-7]+$',
+    },
+  },
+  required: ['secret'],
+  additionalProperties: false,
+} as const;
 
 /**
  * Generate HOTP code (RFC 4226)
@@ -121,8 +135,8 @@ export async function generateTotp(args: GenerateTotpInput): Promise<ToolResult>
  * Tool definition for MCP server - created using SDK's tool() function
  */
 export const generateTotpTool = tool(
-  'generate_totp',
-  'Generates 6-digit TOTP code for authentication. Secret must be base32-encoded.',
+  GENERATE_TOTP_NAME,
+  GENERATE_TOTP_DESCRIPTION,
   GenerateTotpInputSchema.shape,
   generateTotp
 );
