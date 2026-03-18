@@ -461,17 +461,21 @@ Shannon can experimentally route requests through alternative AI providers using
 
 #### Quick Setup
 
-1. Add your provider API key to `.env`:
+1. Configure a router provider:
 
 ```bash
-# Choose one provider:
+# Choose one provider explicitly:
 OPENAI_API_KEY=sk-...
 # OR
 OPENROUTER_API_KEY=sk-or-...
 
 # Set default model:
-ROUTER_DEFAULT=openai,gpt-5.2  # provider,model format
+ROUTER_DEFAULT=openai,gpt-5.3-codex  # provider,model format
 ```
+
+If you already use Codex/ChatGPT locally, Shannon will also try to reuse the
+OpenAI API key stored in `~/.codex/auth.json` when `ROUTER=true` and
+`OPENAI_API_KEY` is not set manually.
 
 2. Run with `ROUTER=true`:
 
@@ -483,12 +487,12 @@ ROUTER_DEFAULT=openai,gpt-5.2  # provider,model format
 
 | Provider | Models |
 |----------|--------|
-| OpenAI | gpt-5.2, gpt-5-mini |
+| OpenAI | gpt-5.2, gpt-5-mini, gpt-5-codex, gpt-5.2-codex, gpt-5.3-codex, codex-mini-latest |
 | OpenRouter | google/gemini-3-flash-preview |
 
 #### Disclaimer
 
-This feature is experimental and unsupported. Output quality depends heavily on the model. Shannon is built on top of the Anthropic Agent SDK and is optimized and primarily tested with Anthropic Claude models. Alternative providers may produce inconsistent results (including failing early phases like Recon) depending on the model and routing setup.
+This feature is experimental and unsupported. Output quality depends heavily on the model. Shannon is built on top of the Anthropic Agent SDK and is optimized and primarily tested with Anthropic Claude models. Alternative providers may produce inconsistent results (including failing early phases like Recon) depending on the model and routing setup. Router mode keeps Shannon's Anthropic SDK/MCP execution loop intact and only swaps the upstream model provider.
 
 ### Output and Results
 

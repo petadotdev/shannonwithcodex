@@ -88,6 +88,53 @@ parse_args() {
   done
 }
 
+# Best-effort: reuse the OpenAI API key that Codex stores after ChatGPT login.
+# This keeps router mode working without requiring the user to manually copy a key.
+load_codex_openai_key() {
+  local codex_home="${CODEX_HOME:-$HOME/.codex}"
+
+  # Git Bash/MSYS may expose CODEX_HOME or USERPROFILE as Windows-style paths.
+  if [ ! -d "$codex_home" ] && command -v cygpath >/dev/null 2>&1; then
+    local converted_codex_home
+    converted_codex_home="$(cygpath -u "$codex_home" 2>/dev/null || true)"
+    if [ -n "$converted_codex_home" ] && [ -d "$converted_codex_home" ]; then
+      codex_home="$converted_codex_home"
+    fi
+  fi
+
+  if [ ! -d "$codex_home" ] && [ -n "$USERPROFILE" ] && command -v cygpath >/dev/null 2>&1; then
+    local userprofile_home
+    userprofile_home="$(cygpath -u "$USERPROFILE" 2>/dev/null || true)"
+    if [ -n "$userprofile_home" ] && [ -d "$userprofile_home/.codex" ]; then
+      codex_home="$userprofile_home/.codex"
+    fi
+  fi
+
+  local auth_file="$codex_home/auth.json"
+
+  if [ ! -f "$auth_file" ]; then
+    return 1
+  fi
+
+  local compact_json
+  compact_json="$(tr -d '\r\n' < "$auth_file")"
+
+  local key
+  key=$(printf '%s' "$compact_json" | sed -n 's/.*"OPENAI_API_KEY"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+
+  if [ -z "$key" ]; then
+    if printf '%s' "$compact_json" | grep -q '"auth_mode"[[:space:]]*:[[:space:]]*"chatgpt"'; then
+      echo "Found Codex auth at $auth_file, but no reusable OPENAI_API_KEY is stored there."
+      echo "Shannon router mode cannot use Codex session tokens directly."
+    fi
+    return 1
+  fi
+
+  export OPENAI_API_KEY="$key"
+  echo "Using OpenAI API key from Codex auth store: $auth_file"
+  return 0
+}
+
 # Check if Temporal is running and healthy
 is_temporal_ready() {
   docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE exec -T temporal \
@@ -142,6 +189,11 @@ cmd_start() {
     exit 1
   fi
 
+  # In router mode, fall back to Codex's locally stored OpenAI API key.
+  if [ "$ROUTER" = "true" ] && [ -z "$OPENAI_API_KEY" ] && [ -z "$OPENROUTER_API_KEY" ]; then
+    load_codex_openai_key || true
+  fi
+
   # Check for API key (Bedrock and router modes can bypass this)
   if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
     if [ "$CLAUDE_CODE_USE_BEDROCK" = "1" ]; then
@@ -187,7 +239,8 @@ cmd_start() {
       echo "ERROR: Set ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN in .env"
       echo "       (or use CLAUDE_CODE_USE_BEDROCK=1 for AWS Bedrock,"
       echo "        CLAUDE_CODE_USE_VERTEX=1 for Google Vertex AI,"
-      echo "        or ROUTER=true with OPENAI_API_KEY or OPENROUTER_API_KEY)"
+      echo "        or ROUTER=true with OPENAI_API_KEY, OPENROUTER_API_KEY,"
+      echo "        or a Codex login stored in \$HOME/.codex/auth.json)"
       exit 1
     fi
   fi
