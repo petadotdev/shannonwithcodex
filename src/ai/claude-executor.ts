@@ -47,7 +47,7 @@ type McpServer = ReturnType<typeof createShannonHelperServer> | StdioMcpServer;
 // Configures MCP servers for agent execution, with Docker-specific Chromium handling
 function buildMcpServers(
   sourceDir: string,
-  agentName: string | null,
+  agentName: AgentName | null,
   logger: ActivityLogger
 ): Record<string, McpServer> {
   // 1. Create the shannon-helper server (always present)
@@ -141,7 +141,7 @@ async function writeErrorLog(
 
 export async function validateAgentOutput(
   result: ClaudePromptResult,
-  agentName: string | null,
+  agentName: AgentName | null,
   sourceDir: string,
   logger: ActivityLogger
 ): Promise<boolean> {
@@ -190,7 +190,7 @@ export async function runClaudePrompt(
   sourceDir: string,
   context: string = '',
   description: string = 'Claude analysis',
-  agentName: string | null = null,
+  agentName: AgentName | null = null,
   auditSession: AuditSession | null = null,
   logger: ActivityLogger,
   modelTier: ModelTier = 'medium'
