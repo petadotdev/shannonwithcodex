@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
@@ -20,6 +19,7 @@ import {
   formatToolUseOutput,
 } from './output-formatters.js';
 import { createProgressManager } from './progress-manager.js';
+import { createTemporaryCodexHome, pathExists } from './codex-home.js';
 import { resolveCodexModel, type ModelTier } from './models.js';
 import type { AgentPromptResult } from './prompt-result.js';
 
@@ -54,15 +54,6 @@ interface CodexEvent {
 function outputLines(lines: string[]): void {
   for (const line of lines) {
     console.log(line);
-  }
-}
-
-async function pathExists(targetPath: string): Promise<boolean> {
-  try {
-    await fs.access(targetPath);
-    return true;
-  } catch {
-    return false;
   }
 }
 
@@ -137,23 +128,7 @@ async function prepareCodexHome(
   agentName: AgentName | null,
   logger: ActivityLogger
 ): Promise<{ codexHome: string; cleanup: () => Promise<void> }> {
-  const mountedCodexHome = process.env.CODEX_HOME || path.join(process.env.HOME || '/tmp', '.codex');
-  const authFile = path.join(mountedCodexHome, 'auth.json');
-  const tempCodexHome = await fs.mkdtemp(path.join(os.tmpdir(), 'shannon-codex-'));
-  const configPath = path.join(tempCodexHome, 'config.toml');
-
-  if (await pathExists(authFile)) {
-    await fs.symlink(authFile, path.join(tempCodexHome, 'auth.json'));
-  }
-
-  await fs.writeFile(configPath, buildCodexConfig(sourceDir, agentName, logger), 'utf8');
-
-  return {
-    codexHome: tempCodexHome,
-    cleanup: async () => {
-      await fs.rm(tempCodexHome, { recursive: true, force: true });
-    },
-  };
+  return createTemporaryCodexHome(buildCodexConfig(sourceDir, agentName, logger));
 }
 
 function isRetryableCodexError(message: string): boolean {

@@ -18,7 +18,6 @@
  */
 
 import fs from 'fs/promises';
-import os from 'os';
 import path from 'path';
 import { spawn } from 'child_process';
 import { query } from '@anthropic-ai/claude-agent-sdk';
@@ -27,6 +26,7 @@ import { PentestError, isRetryableError } from './error-handling.js';
 import { ErrorCode } from '../types/errors.js';
 import { type Result, ok, err } from '../types/result.js';
 import { parseConfig } from '../config-parser.js';
+import { createTemporaryCodexHome, getMountedCodexAuthFile } from '../ai/codex-home.js';
 import { resolveCodexModel, resolveModel } from '../ai/models.js';
 import type { ActivityLogger } from '../types/activity-logger.js';
 
@@ -164,8 +164,7 @@ async function validateCredentials(
   logger: ActivityLogger
 ): Promise<Result<void, PentestError>> {
   if (process.env.SHANNON_AI_BACKEND === 'codex') {
-    const codexHome = process.env.CODEX_HOME || path.join(process.env.HOME || '/tmp', '.codex');
-    const authFile = path.join(codexHome, 'auth.json');
+    const authFile = getMountedCodexAuthFile();
 
     try {
       await fs.access(authFile);
@@ -181,7 +180,8 @@ async function validateCredentials(
       );
     }
 
-    const lastMessagePath = path.join(os.tmpdir(), 'shannon-codex-preflight.txt');
+    const { codexHome, cleanup } = await createTemporaryCodexHome();
+    const lastMessagePath = path.join(codexHome, 'last-message.txt');
     const args = [
       'exec',
       '--json',
@@ -204,7 +204,10 @@ async function validateCredentials(
       await new Promise<void>((resolve, reject) => {
         const child = spawn('codex', args, {
           cwd: process.cwd(),
-          env: process.env,
+          env: {
+            ...process.env,
+            CODEX_HOME: codexHome,
+          },
           stdio: ['ignore', 'pipe', 'pipe'],
         });
 
@@ -239,7 +242,7 @@ async function validateCredentials(
         )
       );
     } finally {
-      await fs.rm(lastMessagePath, { force: true });
+      await cleanup();
     }
   }
 
