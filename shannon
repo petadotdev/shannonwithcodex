@@ -112,6 +112,30 @@ resolve_codex_home_dir() {
   printf '%s\n' "$codex_home"
 }
 
+prepare_codex_mount_dir() {
+  local codex_home
+  codex_home="$(resolve_codex_home_dir)"
+
+  local auth_file="$codex_home/auth.json"
+  if [ ! -r "$auth_file" ]; then
+    echo "ERROR: Codex mode requires a readable auth file at $auth_file"
+    echo "       Run 'codex login' on the host first, then retry with CODEX=true"
+    return 1
+  fi
+
+  local mirror_dir
+  mirror_dir="$(pwd)/.codex-mirror"
+
+  mkdir -p "$mirror_dir"
+  chmod 755 "$mirror_dir"
+  cp "$auth_file" "$mirror_dir/auth.json"
+  chmod 644 "$mirror_dir/auth.json"
+  rm -f "$mirror_dir/config.toml"
+
+  export SHANNON_CODEX_HOME="$mirror_dir"
+  return 0
+}
+
 # Best-effort: reuse the OpenAI API key that Codex stores after ChatGPT login.
 # This keeps router mode working without requiring the user to manually copy a key.
 load_codex_openai_key() {
@@ -153,8 +177,8 @@ is_temporal_ready() {
 ensure_containers() {
   # If custom OUTPUT_DIR is set, always refresh worker to ensure correct volume mount
   # Docker compose will only recreate if the mount actually changed
-  if [ -n "$OUTPUT_DIR" ]; then
-    echo "Ensuring worker has correct output mount..."
+  if [ -n "$OUTPUT_DIR" ] || [ -n "$SHANNON_CODEX_HOME" ]; then
+    echo "Ensuring worker has correct output/auth mounts..."
     docker compose -f "$COMPOSE_FILE" $COMPOSE_OVERRIDE up -d worker 2>/dev/null || true
   fi
 
@@ -204,12 +228,7 @@ cmd_start() {
 
   if [ "$CODEX" = "true" ]; then
     export SHANNON_AI_BACKEND="codex"
-    SHANNON_CODEX_HOME="$(resolve_codex_home_dir)"
-    export SHANNON_CODEX_HOME
-
-    if [ ! -f "$SHANNON_CODEX_HOME/auth.json" ]; then
-      echo "ERROR: Codex mode requires a saved login at $SHANNON_CODEX_HOME/auth.json"
-      echo "       Run 'codex login' on the host first, then retry with CODEX=true"
+    if ! prepare_codex_mount_dir; then
       exit 1
     fi
   else

@@ -52,7 +52,7 @@ services:
       - ./credentials:/app/credentials:ro
       - ./repos:/repos
       - ${BENCHMARKS_BASE:-.}:/benchmarks
-      - ${SHANNON_CODEX_HOME:-./.codex-empty}:/codex-home
+      - ${SHANNON_CODEX_HOME:-./.codex-empty}:/codex-home:ro
     shm_size: 2gb
     ipc: host
     security_opt:

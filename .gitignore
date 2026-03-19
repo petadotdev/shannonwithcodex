@@ -4,3 +4,5 @@ audit-logs/
 credentials/
 dist/
 repos/
+.codex-mirror/
+.codex-empty/
